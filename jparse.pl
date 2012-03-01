@@ -37,13 +37,61 @@ my @tokens2 = (
     ['COMMA'],
     ['STRING' => 'B'],
     ['COMMA'],
+
+    ['OPEN_CURLY'],
+    ['STRING' => 'inner1'],
+    ['COLON'],
+    ['STRING' => 'innerA'],
+    ['CLOSE_CURLY'],
+
+    ['COMMA'],
+    ['OPEN_BRACKET'],
+    ['STRING' => '3'],
+    ['COMMA'],
+    ['STRING' => '2'],
+    ['COMMA'],
+    ['STRING' => '1'],
+    ['CLOSE_BRACKET'],
+    ['COMMA'],
     ['STRING' => 'C'],
     ['COMMA'],
     ['STRING' => 'D'],
+    ['COMMA'],
+    ['OPEN_BRACKET'],
+    ['STRING' => 'E'],
+    ['COMMA'],
+    ['OPEN_BRACKET'],
+    ['STRING' => 'F'],
+    ['CLOSE_BRACKET'],
+    ['CLOSE_BRACKET'],
     ['CLOSE_BRACKET'],
 );
 
-my @tokens = @tokens2;
+my @tokens3 = (
+    ['OPEN_BRACKET'],
+    ['STRING' => 'A'],
+    ['COMMA'],
+
+    ['OPEN_CURLY'],
+    ['STRING' => 'key1'],
+    ['COLON'],
+    ['STRING' => 'val1'],
+    ['COMMA'],
+    ['STRING' => 'key2'],
+    ['COLON'],
+    ['STRING' => 'val2'],
+    ['COMMA'],
+    ['STRING' => 'key3'],
+    ['COLON'],
+    ['STRING' => 'val3'],
+    ['CLOSE_CURLY'],
+
+    ['COMMA'],
+    ['STRING' => 'B'],
+    ['CLOSE_BRACKET'],
+);
+
+my @tokens = @tokens3;
 
 my $grammar = Marpa::XS::Grammar->new({
     start => 'json',
@@ -131,13 +179,29 @@ foreach my $token (@tokens) {
     };
 }
 
-my $output = $rec->value;
+my $output = ${$rec->value};
 say Data::Dumper->Dump([$output], ['final']);
-say $$output->[1];
 
 sub do_default {
     say Data::Dumper->Dump([ [@_] ],[ 'default' ]);
     return $_[1];
+}
+
+sub hash {
+    say Data::Dumper->Dump([ [@_] ],[ 'hash' ]);
+    return $_[2];
+}
+
+sub key_value_pairs {
+    say Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]);
+    my %h;
+    for (keys %{$_[1]}) {
+        $h{$_} = $_[1]->{$_};
+    }
+    for (keys %{$_[3]}) {
+        $h{$_} = $_[3]->{$_};
+    }
+    return \%h;
 }
 
 sub key_value_pair {
