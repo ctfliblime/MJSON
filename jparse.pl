@@ -93,6 +93,39 @@ my @tokens3 = (
 
 my @tokens = @tokens3;
 
+my $json1 = <<EOF;
+[
+"q",
+"w",
+{"A" : "B", "C" : "D"},
+"e
+",
+"r"
+]
+EOF
+my $json = $json1;
+
+sub t {
+    push @tokens, [ @_ ];
+    return '';
+}
+
+@tokens = ();
+while ($json) {
+    $json =~ s/^,/t 'COMMA'/exs;
+    $json =~ s/^:/t 'COLON'/exs;
+    $json =~ s/^\[/t 'OPEN_BRACKET'/exs;
+    $json =~ s/^\]/t 'CLOSE_BRACKET'/exs;
+    $json =~ s/^\{/t 'OPEN_CURLY'/exs;
+    $json =~ s/^\}/t 'CLOSE_CURLY'/exs;
+    $json =~ s/^"([^"]*)"/t STRING => $1/exs;
+    $json =~ s/\s+//xs;
+}
+
+say Dumper \@tokens;
+
+#exit;
+
 my $grammar = Marpa::XS::Grammar->new({
     start => 'json',
     actions => 'main',
