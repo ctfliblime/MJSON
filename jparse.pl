@@ -105,66 +105,27 @@ my $grammar = Marpa::XS::Grammar->new({
     )],
     rules => [
         ### Root
-        {
-            lhs => 'json',
-            rhs => [qw(some_data)],
-        },
+        { lhs => 'json', rhs => [qw(some_data)] },
 
         ### Top level
-        {
-            lhs => 'some_data',
-            rhs => [qw(array)],
-        },
-        {
-            lhs => 'some_data',
-            rhs => [qw(hash)],
-        },
-        {
-            lhs => 'some_data',
-            rhs => [qw(string)],
-        },
+        { lhs => 'some_data', rhs => [qw(array)] },
+        { lhs => 'some_data', rhs => [qw(hash)] },
+        { lhs => 'some_data', rhs => [qw(string)] },
 
         ### Arrays
-        {
-            lhs => 'array',
-            rhs => [qw(OPEN_BRACKET array_elements CLOSE_BRACKET)],
-        },
-        {
-            lhs => 'array_elements',
-            rhs => [qw(array_element COMMA array_elements)],
-        },
-        {
-            lhs => 'array_elements',
-            rhs => [qw(array_element)],
-        },
-        {
-            lhs => 'array_element',
-            rhs => [qw(some_data)],
-        },
+        { lhs => 'array', rhs => [qw(OPEN_BRACKET array_elements CLOSE_BRACKET)] },
+        { lhs => 'array_elements', rhs => [qw(array_element COMMA array_elements)] },
+        { lhs => 'array_elements', rhs => [qw(array_element)] },
+        { lhs => 'array_element', rhs => [qw(some_data)] },
 
         ### Hashes
-        {
-            lhs => 'hash',
-            rhs => [qw(OPEN_CURLY key_value_pairs CLOSE_CURLY)],
-        },
-        {
-            lhs => 'key_value_pairs',
-            rhs => [qw(key_value_pair COMMA key_value_pairs)],
-        },
-        {
-            lhs => 'key_value_pairs',
-            rhs => [qw(key_value_pair)],
-        },
-        {
-            lhs => 'key_value_pair',
-            rhs => [qw(STRING COLON some_data)],
-        },
+        { lhs => 'hash', rhs => [qw(OPEN_CURLY key_value_pairs CLOSE_CURLY)] },
+        { lhs => 'key_value_pairs', rhs => [qw(key_value_pair COMMA key_value_pairs)] },
+        { lhs => 'key_value_pairs', rhs => [qw(key_value_pair)] },
+        { lhs => 'key_value_pair', rhs => [qw(STRING COLON some_data)] },
 
         ### Strings
-        {
-            lhs => 'string',
-            rhs => [qw(STRING)],
-        },
+        { lhs => 'string', rhs => [qw(STRING)] },
     ],
 });
 
