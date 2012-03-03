@@ -6,7 +6,7 @@ use Log::Dispatch;
 
 our $log = Log::Dispatch->new(
     outputs => [
-        [ 'Screen', min_level => 'notice', newline => 1 ],
+        [ 'Screen', min_level => 'info', newline => 1, stderr => 0 ],
     ],
 );
 
@@ -16,18 +16,40 @@ our $log = Log::Dispatch->new(
     sub token_itr {
         my $json = shift;
 
+        my $line = 1;
         return sub {
           TOKEN: {
-                return ['COMMA']           if $json =~ /\G ,        /gcx;
-                return ['COLON']           if $json =~ /\G :        /gcx;
-                return ['OPEN_BRACKET']    if $json =~ /\G \[       /gcx;
-                return ['CLOSE_BRACKET']   if $json =~ /\G \]       /gcx;
-                return ['OPEN_CURLY']      if $json =~ /\G {        /gcx;
-                return ['CLOSE_CURLY']     if $json =~ /\G }        /gcx;
-                return ['STRING' => $1]    if $json =~ /\G "([^"]*)"/gcx;
-                return ['NULL']            if $json =~ /\G null     /gcx;
-                return ['BOOL' => $1]      if $json =~ /\G (true|false)/gcx;
-                redo TOKEN                 if $json =~ /\G \s+      /gcx;
+                $line++                    if $json =~ /\G \n/gcx;
+                return ['COMMA' => {line=>$line}]
+                    if $json =~ /\G , /gcx;
+
+                return ['COLON' => {line=>$line}]
+                    if $json =~ /\G : /gcx;
+
+                return ['OPEN_BRACKET' => {line=>$line}]
+                    if $json =~ /\G \[ /gcx;
+
+                return ['CLOSE_BRACKET' => {line=>$line}]
+                    if $json =~ /\G \] /gcx;
+
+                return ['OPEN_CURLY' => {line=>$line}]
+                    if $json =~ /\G { /gcx;
+
+                return ['CLOSE_CURLY' => {line=>$line}]
+                    if $json =~ /\G } /gcx;
+
+                return ['STRING' => {line=>$line, value=>$1}]
+                    if $json =~ /\G "([^"]*)"/gcx;
+
+                return ['NULL' => {line=>$line}]
+                    if $json =~ /\G null /gcx;
+
+                return ['BOOL' => {line=>$line, value=>$1}]
+                    if $json =~ /\G (true|false) /gcx;
+
+                redo TOKEN
+                    if $json =~ /\G \s+ /gcx;
+
                 return undef;
             }
         };
@@ -41,7 +63,7 @@ our $log = Log::Dispatch->new(
         my $t;
         push @tokens, $t while ($t = $itr->());
 
-        $log->info(Data::Dumper->Dump([\@tokens], ['tokens']));
+        $log->debug(Data::Dumper->Dump([\@tokens], ['tokens']));
 
         return @tokens;
     }
@@ -59,7 +81,7 @@ our $log = Log::Dispatch->new(
 
     sub bool {
         $log->debug(Data::Dumper->Dump([ [@_] ],[ 'bool' ]));
-        return ($_[1] eq 'false') ? undef : 1;
+        return ($_[1]{value} eq 'false') ? undef : 1;
     }
 
     sub null {
@@ -86,7 +108,7 @@ our $log = Log::Dispatch->new(
 
     sub key_value_pair {
         $log->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]));
-        return {$_[1] => $_[3]};
+        return {$_[1]{value} => $_[3]};
     }
 
     sub array {
@@ -111,8 +133,8 @@ our $log = Log::Dispatch->new(
     }
 
     sub string {
-        $log->debug("string:$_[1]");
-        return $_[1];
+        $log->debug(Data::Dumper->Dump([ [@_] ],[ 'string' ]));
+        return $_[1]{value};
     }
 
     sub json {
@@ -179,10 +201,13 @@ my @tokens = MJSON::Tokenize::tokenize($json);
 
 for my $token (@tokens) {
     if (defined $rec->read( @$token )) {
-        $log->debug("reading Token: @$token");
-    } else {
-        $log->log_and_die("Error reading Token: @$token");
-    };
+        $log->debug("Reading token: ".Data::Dumper->Dump($token, ['token']));
+    }
+    else {
+        $log->log_and_die(level => 'fatal',
+                          message => sprintf('Error near line %d reading token "%s".',
+                                      $token->[1]{line}, $token->[0]));
+    }
 }
 
 my $output = ${$rec->value};
