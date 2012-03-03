@@ -25,6 +25,61 @@ EOF
 
 my $json2 = q{"A\"B"};
 
+my $json3 = <<EOF;
+{
+    "glossary": {
+        "title": "example glossary",
+        "GlossDiv": {
+            "title": "S",
+            "GlossList": {
+                "GlossEntry": {
+                    "ID": "SGML",
+                    "SortAs": "SGML",
+                    "GlossTerm": "Standard Generalized Markup Language",
+                    "Acronym": "SGML",
+                    "Abbrev": "ISO 8879:1986",
+                    "GlossDef": {
+                        "para": "A meta-markup language, used to create markup languages such as DocBook.",
+                        "GlossSeeAlso": ["GML", "XML"]
+                    },
+                    "GlossSee": "markup"
+                }
+            }
+        }
+    }
+}
+EOF
+
+my $json4 = <<EOF;
+{"menu": {
+    "header": "SVG Viewer",
+    "items": [
+        {"id": "Open"},
+        {"id": "OpenNew", "label": "Open New"},
+        null,
+        {"id": "ZoomIn", "label": "Zoom In"},
+        {"id": "ZoomOut", "label": "Zoom Out"},
+        {"id": "OriginalView", "label": "Original View"},
+        null,
+        {"id": "Quality"},
+        {"id": "Pause"},
+        {"id": "Mute"},
+        null,
+        {"id": "Find", "label": "Find..."},
+        {"id": "FindAgain", "label": "Find Again"},
+        {"id": "Copy"},
+        {"id": "CopyAgain", "label": "Copy Again"},
+        {"id": "CopySVG", "label": "Copy SVG"},
+        {"id": "ViewSVG", "label": "View SVG"},
+        {"id": "ViewSource", "label": "View Source"},
+        {"id": "SaveAs", "label": "Save As"},
+        null,
+        {"id": "Help"},
+        {"id": "About", "label": "About Adobe CVG Viewer..."}
+    ]
+}}
+EOF
+
 sub token_itr {
     my $json = shift;
 
@@ -37,6 +92,7 @@ sub token_itr {
             return ['OPEN_CURLY']      if $json =~ /\G {        /gcx;
             return ['CLOSE_CURLY']     if $json =~ /\G }        /gcx;
             return ['STRING' => $1]    if $json =~ /\G "([^"]*)"/gcx;
+            return ['NULL']            if $json =~ /\G null     /gcx;
             redo TOKEN                 if $json =~ /\G \s+      /gcx;
             return undef;
         }
@@ -45,7 +101,7 @@ sub token_itr {
 
 sub tokenize {
     my $json = shift;
-    my $itr = token_itr($json1);
+    my $itr = token_itr($json);
     my @tokens;
 
     my $t;
@@ -53,7 +109,7 @@ sub tokenize {
     return @tokens;
 }
 
-my @tokens = tokenize($json1);
+my @tokens = tokenize($json4);
 
 $log->info(Dumper \@tokens);
 
@@ -65,7 +121,7 @@ my $grammar = Marpa::XS::Grammar->new({
         OPEN_CURLY CLOSE_CURLY
         OPEN_BRACKET CLOSE_BRACKET
         COMMA COLON
-        STRING
+        STRING NULL
     )],
     rules => [
         ### Root
@@ -75,6 +131,7 @@ my $grammar = Marpa::XS::Grammar->new({
         { lhs => 'some_data', rhs => [qw(array)] },
         { lhs => 'some_data', rhs => [qw(hash)] },
         { lhs => 'some_data', rhs => [qw(string)] },
+        { lhs => 'some_data', rhs => [qw(null)] },
 
         ### Arrays
         { lhs => 'array', rhs => [qw(OPEN_BRACKET array_elements CLOSE_BRACKET)] },
@@ -90,6 +147,9 @@ my $grammar = Marpa::XS::Grammar->new({
 
         ### Strings
         { lhs => 'string', rhs => [qw(STRING)] },
+
+        ### Null
+        { lhs => 'null', rhs => [qw(NULL)] },
     ],
 });
 
@@ -110,6 +170,11 @@ $log->notice(Data::Dumper->Dump([$output], ['final']));
 sub do_default {
     $log->debug(Data::Dumper->Dump([ [@_] ],[ 'default' ]));
     return $_[1];
+}
+
+sub null {
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'null' ]));
+    return undef;
 }
 
 sub hash {
@@ -146,8 +211,7 @@ sub array_elements {
 }
 
 sub array_element {
-    #$log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_element' ]));
-#    $log->debug("array_element:$_[1]");
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_element' ]));
     return $_[1];
 }
 
