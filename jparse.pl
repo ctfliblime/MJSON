@@ -3,95 +3,14 @@
 use Modern::Perl;
 
 use Marpa::XS;
+use Log::Dispatch;
 use Data::Dumper;
 
-my @tokens1 = (
-    ['OPEN_CURLY'],
-
-    ['STRING' => 'asdf'],
-    ['COLON'],
-    ['STRING' => 'qwer'],
-
-    ['COMMA'],
-
-    ['STRING' => 'ZCXV'],
-    ['COLON'],
-    ['STRING' => 'VNMB'],
-
-    ['COMMA'],
-
-    ['STRING' => 'ZCXV'],
-    ['COLON'],
-    ['OPEN_CURLY'],
-    ['STRING' => 'inner1'],
-    ['COLON'],
-    ['STRING' => 'innerA'],
-    ['CLOSE_CURLY'],
-
-    ['CLOSE_CURLY'],
+our $log = Log::Dispatch->new(
+    outputs => [
+        [ 'Screen', min_level => 'notice', newline => 1 ],
+    ],
 );
-
-my @tokens2 = (
-    ['OPEN_BRACKET'],
-    ['STRING' => 'A'],
-    ['COMMA'],
-    ['STRING' => 'B'],
-    ['COMMA'],
-
-    ['OPEN_CURLY'],
-    ['STRING' => 'inner1'],
-    ['COLON'],
-    ['STRING' => 'innerA'],
-    ['CLOSE_CURLY'],
-
-    ['COMMA'],
-    ['OPEN_BRACKET'],
-    ['STRING' => '3'],
-    ['COMMA'],
-    ['STRING' => '2'],
-    ['COMMA'],
-    ['STRING' => '1'],
-    ['CLOSE_BRACKET'],
-    ['COMMA'],
-    ['STRING' => 'C'],
-    ['COMMA'],
-    ['STRING' => 'D'],
-    ['COMMA'],
-    ['OPEN_BRACKET'],
-    ['STRING' => 'E'],
-    ['COMMA'],
-    ['OPEN_BRACKET'],
-    ['STRING' => 'F'],
-    ['CLOSE_BRACKET'],
-    ['CLOSE_BRACKET'],
-    ['CLOSE_BRACKET'],
-);
-
-my @tokens3 = (
-    ['OPEN_BRACKET'],
-    ['STRING' => 'A'],
-    ['COMMA'],
-
-    ['OPEN_CURLY'],
-    ['STRING' => 'key1'],
-    ['COLON'],
-    ['STRING' => 'val1'],
-    ['COMMA'],
-    ['STRING' => 'key2'],
-    ['COLON'],
-    ['STRING' => 'val2'],
-    ['COMMA'],
-    ['STRING' => 'key3'],
-    ['COLON'],
-    ['STRING' => 'val3'],
-    ['CLOSE_CURLY'],
-
-    ['COMMA'],
-    ['STRING' => 'B'],
-    ['CLOSE_BRACKET'],
-);
-
-my @tokens = @tokens3;
 
 my $json1 = <<EOF;
 [
@@ -103,28 +22,36 @@ my $json1 = <<EOF;
 "r"
 ]
 EOF
-my $json = $json1;
 
-sub t {
-    push @tokens, [ @_ ];
-    return '';
+my $json2 = q{"A\"B"};
+
+sub tokenize {
+    my $json = shift;
+    my @tokens;
+
+    my $t = sub {
+        $log->debug("TOKEN:$_[0];");
+        push @tokens, [ @_ ];
+        return '';
+    };
+
+    while ($json) {
+        $json =~ s/\A,/$t->('COMMA')/exms and next;
+        $json =~ s/\A:/$t->('COLON')/exms and next;
+        $json =~ s/\A\[/$t->('OPEN_BRACKET')/exms and next;
+        $json =~ s/\A\]/$t->('CLOSE_BRACKET')/exms and next;
+        $json =~ s/\A\{/$t->('OPEN_CURLY')/exms and next;
+        $json =~ s/\A\}/$t->('CLOSE_CURLY')/exms and next;
+        $json =~ s/\A"(.*?)(?<!\\)"/$t->('STRING' => $1)/exms and next;
+        $json =~ s/\A\s+//xms and next;
+        die "TOKENIZE FAILURE:$json;";
+    }
+    return @tokens;
 }
 
-@tokens = ();
-while ($json) {
-    $json =~ s/^,/t 'COMMA'/exs;
-    $json =~ s/^:/t 'COLON'/exs;
-    $json =~ s/^\[/t 'OPEN_BRACKET'/exs;
-    $json =~ s/^\]/t 'CLOSE_BRACKET'/exs;
-    $json =~ s/^\{/t 'OPEN_CURLY'/exs;
-    $json =~ s/^\}/t 'CLOSE_CURLY'/exs;
-    $json =~ s/^"([^"]*)"/t STRING => $1/exs;
-    $json =~ s/\s+//xs;
-}
+my @tokens = tokenize($json1);
 
-say Dumper \@tokens;
-
-#exit;
+$log->info(Dumper \@tokens);
 
 my $grammar = Marpa::XS::Grammar->new({
     start => 'json',
@@ -167,27 +94,27 @@ $grammar->precompute;
 my $rec = Marpa::XS::Recognizer->new( { grammar => $grammar } );
 foreach my $token (@tokens) {
     if (defined $rec->read( @$token )) {
-        say "reading Token: @$token";
+        $log->debug("reading Token: @$token");
     } else {
-        die "Error reading Token: @$token";
+        $log->log_and_die("Error reading Token: @$token");
     };
 }
 
 my $output = ${$rec->value};
-say Data::Dumper->Dump([$output], ['final']);
+$log->notice(Data::Dumper->Dump([$output], ['final']));
 
 sub do_default {
-    say Data::Dumper->Dump([ [@_] ],[ 'default' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'default' ]));
     return $_[1];
 }
 
 sub hash {
-    say Data::Dumper->Dump([ [@_] ],[ 'hash' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'hash' ]));
     return $_[2];
 }
 
 sub key_value_pairs {
-    say Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
     my %h;
     for (keys %{$_[1]}) {
         $h{$_} = $_[1]->{$_};
@@ -199,38 +126,38 @@ sub key_value_pairs {
 }
 
 sub key_value_pair {
-    say Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]));
     return {$_[1] => $_[3]};
 }
 
 sub array {
-    say Data::Dumper->Dump([ [@_] ],[ 'array' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'array' ]));
     return $_[2];
 }
 
 sub array_elements {
-    say Data::Dumper->Dump([ [@_] ],[ 'array_elements' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_elements' ]));
     my @a = map {$_} $_[1], @{$_[3]};
     return \@a;
 }
 
 sub array_element {
-    #say Data::Dumper->Dump([ [@_] ],[ 'array_element' ]);
-#    say "array_element:$_[1]";
+    #$log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_element' ]));
+#    $log->debug("array_element:$_[1]");
     return $_[1];
 }
 
 sub some_data {
-    say Data::Dumper->Dump([ [@_] ],[ 'some_data' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'some_data' ]));
     return $_[1];
 }
 
 sub string {
-    say "string:$_[1]";
+    $log->debug("string:$_[1]");
     return $_[1];
 }
 
 sub json {
-    say Data::Dumper->Dump([ [@_] ],[ 'json' ]);
+    $log->debug(Data::Dumper->Dump([ [@_] ],[ 'json' ]));
     return $_[1];
 }
