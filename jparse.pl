@@ -26,6 +26,7 @@ our $log = Log::Dispatch->new(
                 return ['CLOSE_CURLY']     if $json =~ /\G }        /gcx;
                 return ['STRING' => $1]    if $json =~ /\G "([^"]*)"/gcx;
                 return ['NULL']            if $json =~ /\G null     /gcx;
+                return ['BOOL' => $1]      if $json =~ /\G (true|false)/gcx;
                 redo TOKEN                 if $json =~ /\G \s+      /gcx;
                 return undef;
             }
@@ -40,7 +41,7 @@ our $log = Log::Dispatch->new(
         my $t;
         push @tokens, $t while ($t = $itr->());
 
-        $log->info(Dumper \@tokens);
+        $log->info(Data::Dumper->Dump([\@tokens], ['tokens']));
 
         return @tokens;
     }
@@ -54,6 +55,11 @@ our $log = Log::Dispatch->new(
     sub do_default {
         $log->debug(Data::Dumper->Dump([ [@_] ],[ 'default' ]));
         return $_[1];
+    }
+
+    sub bool {
+        $log->debug(Data::Dumper->Dump([ [@_] ],[ 'bool' ]));
+        return ($_[1] eq 'false') ? undef : 1;
     }
 
     sub null {
@@ -128,7 +134,7 @@ my $grammar = Marpa::XS::Grammar->new({
         OPEN_CURLY CLOSE_CURLY
         OPEN_BRACKET CLOSE_BRACKET
         COMMA COLON
-        STRING NULL
+        STRING NULL BOOL
     )],
     rules => [
         ### Root
@@ -138,6 +144,7 @@ my $grammar = Marpa::XS::Grammar->new({
         { lhs => 'some_data', rhs => [qw(array)] },
         { lhs => 'some_data', rhs => [qw(hash)] },
         { lhs => 'some_data', rhs => [qw(string)] },
+        { lhs => 'some_data', rhs => [qw(bool)] },
         { lhs => 'some_data', rhs => [qw(null)] },
 
         ### Arrays
@@ -154,6 +161,9 @@ my $grammar = Marpa::XS::Grammar->new({
 
         ### Strings
         { lhs => 'string', rhs => [qw(STRING)] },
+
+        ### Boolean
+        { lhs => 'bool', rhs => [qw(BOOL)] },
 
         ### Null
         { lhs => 'null', rhs => [qw(NULL)] },
