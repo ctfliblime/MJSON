@@ -25,27 +25,31 @@ EOF
 
 my $json2 = q{"A\"B"};
 
+sub token_itr {
+    my $json = shift;
+
+    return sub {
+        TOKEN: {
+            return ['COMMA']           if $json =~ /\G ,        /gcx;
+            return ['COLON']           if $json =~ /\G :        /gcx;
+            return ['OPEN_BRACKET']    if $json =~ /\G \[       /gcx;
+            return ['CLOSE_BRACKET']   if $json =~ /\G \]       /gcx;
+            return ['OPEN_CURLY']      if $json =~ /\G {        /gcx;
+            return ['CLOSE_CURLY']     if $json =~ /\G }        /gcx;
+            return ['STRING' => $1]    if $json =~ /\G "([^"]*)"/gcx;
+            redo TOKEN                 if $json =~ /\G \s+      /gcx;
+            return undef;
+        }
+    };
+}
+
 sub tokenize {
     my $json = shift;
+    my $itr = token_itr($json1);
     my @tokens;
 
-    my $t = sub {
-        $log->debug("TOKEN:$_[0];");
-        push @tokens, [ @_ ];
-        return '';
-    };
-
-    while ($json) {
-        $json =~ s/\A,/$t->('COMMA')/exms and next;
-        $json =~ s/\A:/$t->('COLON')/exms and next;
-        $json =~ s/\A\[/$t->('OPEN_BRACKET')/exms and next;
-        $json =~ s/\A\]/$t->('CLOSE_BRACKET')/exms and next;
-        $json =~ s/\A\{/$t->('OPEN_CURLY')/exms and next;
-        $json =~ s/\A\}/$t->('CLOSE_CURLY')/exms and next;
-        $json =~ s/\A"(.*?)(?<!\\)"/$t->('STRING' => $1)/exms and next;
-        $json =~ s/\A\s+//xms and next;
-        die "TOKENIZE FAILURE:$json;";
-    }
+    my $t;
+    push @tokens, $t while ($t = $itr->());
     return @tokens;
 }
 
