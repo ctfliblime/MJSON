@@ -19,7 +19,7 @@ our $log = Log::Dispatch->new(
         my $line = 1;
         return sub {
           TOKEN: {
-                $line++                    if $json =~ /\G \n/gcx;
+                $line++ if $json =~ /\G \n/gcx;
                 return ['COMMA' => {line=>$line}]
                     if $json =~ /\G , /gcx;
 
