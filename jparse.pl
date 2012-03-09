@@ -72,7 +72,7 @@ our $log = Log::Dispatch->new(
 }
 
 {
-    package MJSON;
+    package MJSON::Parse;
 
     sub do_default {
         $log->debug(Data::Dumper->Dump([ [@_] ],[ 'default' ]));
@@ -150,7 +150,7 @@ use IO::All;
 
 my $grammar = Marpa::XS::Grammar->new({
     start => 'json',
-    actions => 'MJSON',
+    actions => 'MJSON::Parse',
     default_action => 'do_default',
     terminals => [qw(
         OPEN_CURLY CLOSE_CURLY
