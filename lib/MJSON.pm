@@ -122,34 +122,38 @@ method tokenize(Str $json) {
 }
 
 method BUILD(@args) {
+    *MJSON::Logger::new = sub { return {log=>$self->log} };
+    $self->grammar->set({action_object => 'MJSON::Logger'});
+
     $self->grammar->precompute;
     $self->recognizer(
-        Marpa::XS::Recognizer->new( {grammar => $self->grammar, trace_terminals => 2} )
+        Marpa::XS::Recognizer->new(
+            {grammar => $self->grammar, trace_terminals => 0} )
     );
 }
 
-sub do_default {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'default' ]));
-    return $_[1];
+func do_default($ppt, $data) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$data] ],[ 'default' ]));
+    return $data;
 }
 
-sub bool {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'bool' ]));
-    return ($_[1]{value} eq 'false') ? undef : 1;
+func bool($ppt, $bool) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$bool] ],[ 'bool' ]));
+    return ($bool->{value} eq 'false') ? undef : 1;
 }
 
-sub null {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'null' ]));
+func null($ppt, $null) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ $null ],[ 'null' ]));
     return undef;
 }
 
-sub hash {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'hash' ]));
-    return $_[2];
+func hash($ppt, $null1, HashRef $hash, $null2) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$hash] ],[ 'hash' ]));
+    return $hash;
 }
 
-sub key_value_pairs {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
+func key_value_pairs($ppt, @args) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
     my %h;
     for (keys %{$_[1]}) {
         $h{$_} = $_[1]->{$_};
@@ -160,41 +164,39 @@ sub key_value_pairs {
     return \%h;
 }
 
-sub key_value_pair {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]));
-    return {$_[1]{value} => $_[3]};
+func key_value_pair($ppt, $key, $null, $value) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]));
+    return {$key->{value} => $value};
 }
 
-sub array {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'array' ]));
-    return $_[2];
+func array($ppt, $null0, $array, $null1) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ $array ],[ 'array' ]));
+    return $array;
 }
 
-sub array_elements {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_elements' ]));
-    my @a = map {$_} $_[1], @{$_[3]};
-    return \@a;
+func array_elements($ppt, @args) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'array_elements' ]));
+    [ map {$_} $_[1], @{$_[3]} ];
 }
 
-sub array_element {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'array_element' ]));
-    return $_[1];
+func array_element($ppt, $elem) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$elem] ],[ 'array_element' ]));
+    return $elem;
 }
 
-sub some_data {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'some_data' ]));
-    return $_[1];
+func some_data($ppt, $data) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$data] ],[ 'some_data' ]));
+    return $data;
 }
 
-sub string {
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'string' ]));
-    return $_[1]{value};
+func string($ppt, $string) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$string] ],[ 'string' ]));
+    return $string->{value};
 }
 
-sub json {
-    say Dumper \@_;
-    #$self->log->debug(Data::Dumper->Dump([ [@_] ],[ 'json' ]));
-    return $_[1];
+func json($ppt, $json) {
+    $ppt->{log}->debug(Data::Dumper->Dump([ [$json] ],[ 'json' ]));
+    return $json;
 }
 
 method parse(Str $json) {
@@ -202,12 +204,14 @@ method parse(Str $json) {
 
     for my $token (@tokens) {
         if (defined $self->recognizer->read( @$token )) {
-            $self->log->debug("Reading token: ".Data::Dumper->Dump($token, ['token']));
+            $self->log->debug(
+                'Reading token: '.Data::Dumper->Dump($token, ['token']));
         }
         else {
-            $self->log->log_and_die(level => 'fatal',
-                              message => sprintf('Error near line %d reading token "%s".',
-                                                 $token->[1]{line}, $token->[0]));
+            $self->log->log_and_die(
+                level => 'fatal',
+                message => sprintf('Error near line %d reading token "%s".',
+                                   $token->[1]{line}, $token->[0]));
         }
     }
 

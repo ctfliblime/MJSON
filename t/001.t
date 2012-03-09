@@ -15,6 +15,6 @@ my $log = Log::Dispatch->new(
 my $m = MJSON->new(log => $log);
 isa_ok $m, 'MJSON';
 
-my $output = $m->parse(q/{ "a" : "b" }/);
+my $output = $m->parse(q/{ "a" : "b", "c" : false, "d" : ["q","w"] }/);
 
 done_testing;
