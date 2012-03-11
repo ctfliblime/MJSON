@@ -4,7 +4,6 @@ use 5.14.0;
 
 use MJSON;
 use Test::More;
-use Test::Deep;
 
 my @tests = (
     {json => q/
@@ -141,7 +140,7 @@ true,
 
 for my $test (@tests) {
     my $output = MJSON->new->parse($test->{json});
-    cmp_deeply($output, $test->{expected});
+    is_deeply($output, $test->{expected});
 }
 
 done_testing;
