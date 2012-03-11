@@ -83,7 +83,10 @@ method tokenize(Str $json) {
 }
 
 method BUILD(@args) {
-    *MJSON::Logger::new = sub { return {log=>$self->log} };
+    {
+        no warnings qw(redefine);
+        *MJSON::Logger::new = sub { return {log=>$self->log} };
+    }
     $self->grammar->set({action_object => 'MJSON::Logger'});
 
     $self->grammar->precompute;
