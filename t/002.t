@@ -141,9 +141,9 @@ true,
     },
 );
 
-
+my $parser = MJSON->new;
 for my $test (@tests) {
-    my $output = MJSON->new->parse($test->{json});
+    my $output = $parser->parse($test->{json});
     is_deeply($output, $test->{expected});
 }
 

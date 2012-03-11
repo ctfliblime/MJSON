@@ -19,11 +19,6 @@ has 'grammar' => (
         sub {Marpa::XS::Grammar->new($MJSON::Grammar::default)},
 );
 
-has 'recognizer' => (
-    is => 'rw',
-    isa => 'Marpa::XS::Recognizer',
-);
-
 has 'log' => (
     is => 'ro',
     isa => 'Log::Dispatch',
@@ -90,17 +85,15 @@ method BUILD(@args) {
     $self->grammar->set({action_object => 'MJSON::Logger'});
 
     $self->grammar->precompute;
-    $self->recognizer(
-        Marpa::XS::Recognizer->new(
-            {grammar => $self->grammar, trace_terminals => 0} )
-    );
 }
 
 method parse(Str $json) {
     my @tokens = $self->tokenize($json);
 
+    my $recognizer = Marpa::XS::Recognizer->new(
+        {grammar => $self->grammar, trace_terminals => 0} );
     for my $token (@tokens) {
-        if (defined $self->recognizer->read( @$token )) {
+        if (defined $recognizer->read( @$token )) {
             $self->log->debug('TOKEN:'.$token->[0]);
         }
         else {
@@ -111,7 +104,7 @@ method parse(Str $json) {
         }
     }
 
-    my $output = ${$self->recognizer->value};
+    my $output = ${$recognizer->value};
     $self->log->debug(Dumper($output), 'final');
     return $output;
 }
