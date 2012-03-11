@@ -2,71 +2,32 @@ package MJSON;
 
 use 5.14.0;
 
+our $VERSION = '0.000';
+
 use Any::Moose;
 use Method::Signatures;
 use Marpa::XS;
 use Log::Dispatch;
 use Data::Dumper;
-
-our $default_grammar_def = {
-    start => 'json',
-    actions => 'MJSON',
-    default_action => 'do_default',
-    terminals => [qw(
-        OPEN_CURLY CLOSE_CURLY
-        OPEN_BRACKET CLOSE_BRACKET
-        COMMA COLON
-        STRING NULL BOOL
-    )],
-    rules => [
-        ### Root
-        { lhs => 'json', rhs => [qw(some_data)] },
-
-        ### Top level
-        { lhs => 'some_data', rhs => [qw(array)] },
-        { lhs => 'some_data', rhs => [qw(hash)] },
-        { lhs => 'some_data', rhs => [qw(string)] },
-        { lhs => 'some_data', rhs => [qw(bool)] },
-        { lhs => 'some_data', rhs => [qw(null)] },
-
-        ### Arrays
-        { lhs => 'array', rhs => [qw(OPEN_BRACKET array_elements CLOSE_BRACKET)] },
-        { lhs => 'array_elements', rhs => [qw(array_element COMMA array_elements)] },
-        { lhs => 'array_elements', rhs => [qw(array_element)] },
-        { lhs => 'array_element', rhs => [qw(some_data)] },
-
-        ### Hashes
-        { lhs => 'hash', rhs => [qw(OPEN_CURLY key_value_pairs CLOSE_CURLY)] },
-        { lhs => 'key_value_pairs', rhs => [qw(key_value_pair COMMA key_value_pairs)] },
-        { lhs => 'key_value_pairs', rhs => [qw(key_value_pair)] },
-        { lhs => 'key_value_pair', rhs => [qw(STRING COLON some_data)] },
-
-        ### Strings
-        { lhs => 'string', rhs => [qw(STRING)] },
-
-        ### Boolean
-        { lhs => 'bool', rhs => [qw(BOOL)] },
-
-        ### Null
-        { lhs => 'null', rhs => [qw(NULL)] },
-    ],
-};
-
-has 'log' => (
-    is => 'ro',
-    isa => 'Log::Dispatch',
-    default => sub {Log::Dispatch->new()},
-);
+use MJSON::Grammar;
+use MJSON::ParseActions;
 
 has 'grammar' => (
     is => 'ro',
     isa => 'Marpa::XS::Grammar',
-    default => sub {Marpa::XS::Grammar->new($MJSON::default_grammar_def)},
+    default =>
+        sub {Marpa::XS::Grammar->new($MJSON::Grammar::default)},
 );
 
 has 'recognizer' => (
     is => 'rw',
     isa => 'Marpa::XS::Recognizer',
+);
+
+has 'log' => (
+    is => 'ro',
+    isa => 'Log::Dispatch',
+    default => sub {Log::Dispatch->new()},
 );
 
 func token_itr(Str $json) {
@@ -132,86 +93,12 @@ method BUILD(@args) {
     );
 }
 
-func ddump($log, $data, $label) {
-    $log->log(level => 'debug', message => sub {
-                  Data::Dumper->Dump([ $data ],[ $label ]);
-              });
-}
-
-func do_default($ppt, $data) {
-    ddump($ppt->{log}, $data, 'DEFAULT');
-    return $data;
-}
-
-func bool($ppt, $bool) {
-    ddump($ppt->{log}, $bool, 'bool');
-    return ($bool->{value} eq 'false') ? undef : 1;
-}
-
-func null($ppt, $null) {
-    ddump($ppt->{log}, $null, 'null');
-    return undef;
-}
-
-func hash($ppt, $null1, HashRef $hash, $null2) {
-    ddump($ppt->{log}, $hash, 'hash');
-    return $hash;
-}
-
-func key_value_pairs($ppt, @args) {
-    ddump($ppt->{log}, \@_, 'key_value_pair');
-    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
-    my %h;
-    for (keys %{$_[1]}) {
-        $h{$_} = $_[1]->{$_};
-    }
-    for (keys %{$_[3]}) {
-        $h{$_} = $_[3]->{$_};
-    }
-    return \%h;
-}
-
-func key_value_pair($ppt, $key, $null, $value) {
-    ddump($ppt->{log}, \@_, 'key_value_pair');
-    return {$key->{value} => $value};
-}
-
-func array($ppt, $null0, $array, $null1) {
-    ddump($ppt->{log}, $array, 'array');
-    return $array;
-}
-
-func array_elements($ppt, @args) {
-    ddump($ppt->{log}, \@_, 'array_elements');
-    [ map {$_} $_[1], @{$_[3]} ];
-}
-
-func array_element($ppt, $elem) {
-    ddump($ppt->{log}, $elem, 'array_element');
-    return $elem;
-}
-
-func some_data($ppt, $data) {
-    ddump($ppt->{log}, $data, 'some_data');
-    return $data;
-}
-
-func string($ppt, $string) {
-    ddump($ppt->{log}, $string, 'string');
-    return $string->{value};
-}
-
-func json($ppt, $json) {
-    ddump($ppt->{log}, $json, 'json');
-    return $json;
-}
-
 method parse(Str $json) {
     my @tokens = $self->tokenize($json);
 
     for my $token (@tokens) {
         if (defined $self->recognizer->read( @$token )) {
-            ddump($self->log, $token, 'token');
+            $self->log->debug('TOKEN:'.$token->[0]);
         }
         else {
             $self->log->log_and_die(
@@ -222,7 +109,7 @@ method parse(Str $json) {
     }
 
     my $output = ${$self->recognizer->value};
-    ddump($self->log, $output, 'final');
+    $self->log->debug(Dumper($output), 'final');
     return $output;
 }
 
