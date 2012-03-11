@@ -135,6 +135,10 @@ true,
     ]
 }}
     },
+    {
+        json => q/"A\"B"/,
+        expected => 'A"B'
+    },
 );
 
 
