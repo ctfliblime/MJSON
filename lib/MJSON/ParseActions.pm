@@ -33,7 +33,6 @@ func hash($ppt, $null1, HashRef $hash, $null2) {
 
 func key_value_pairs($ppt, @args) {
     ddump($ppt->{log}, \@_, 'key_value_pair');
-    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
     my %h;
     for (keys %{$_[1]}) {
         $h{$_} = $_[1]->{$_};
