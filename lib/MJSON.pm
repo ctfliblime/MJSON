@@ -2,7 +2,7 @@ package MJSON;
 
 use 5.14.0;
 
-use Mouse;
+use Any::Moose;
 use Method::Signatures;
 use Marpa::XS;
 use Log::Dispatch;
@@ -132,27 +132,34 @@ method BUILD(@args) {
     );
 }
 
+func ddump($log, $data, $label) {
+    $log->log(level => 'debug', message => sub {
+                  Data::Dumper->Dump([ $data ],[ $label ]);
+              });
+}
+
 func do_default($ppt, $data) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$data] ],[ 'default' ]));
+    ddump($ppt->{log}, $data, 'DEFAULT');
     return $data;
 }
 
 func bool($ppt, $bool) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$bool] ],[ 'bool' ]));
+    ddump($ppt->{log}, $bool, 'bool');
     return ($bool->{value} eq 'false') ? undef : 1;
 }
 
 func null($ppt, $null) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ $null ],[ 'null' ]));
+    ddump($ppt->{log}, $null, 'null');
     return undef;
 }
 
 func hash($ppt, $null1, HashRef $hash, $null2) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$hash] ],[ 'hash' ]));
+    ddump($ppt->{log}, $hash, 'hash');
     return $hash;
 }
 
 func key_value_pairs($ppt, @args) {
+    ddump($ppt->{log}, \@_, 'key_value_pair');
     $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pairs' ]));
     my %h;
     for (keys %{$_[1]}) {
@@ -165,37 +172,37 @@ func key_value_pairs($ppt, @args) {
 }
 
 func key_value_pair($ppt, $key, $null, $value) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'key_value_pair' ]));
+    ddump($ppt->{log}, \@_, 'key_value_pair');
     return {$key->{value} => $value};
 }
 
 func array($ppt, $null0, $array, $null1) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ $array ],[ 'array' ]));
+    ddump($ppt->{log}, $array, 'array');
     return $array;
 }
 
 func array_elements($ppt, @args) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [@_] ],[ 'array_elements' ]));
+    ddump($ppt->{log}, \@_, 'array_elements');
     [ map {$_} $_[1], @{$_[3]} ];
 }
 
 func array_element($ppt, $elem) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$elem] ],[ 'array_element' ]));
+    ddump($ppt->{log}, $elem, 'array_element');
     return $elem;
 }
 
 func some_data($ppt, $data) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$data] ],[ 'some_data' ]));
+    ddump($ppt->{log}, $data, 'some_data');
     return $data;
 }
 
 func string($ppt, $string) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$string] ],[ 'string' ]));
+    ddump($ppt->{log}, $string, 'string');
     return $string->{value};
 }
 
 func json($ppt, $json) {
-    $ppt->{log}->debug(Data::Dumper->Dump([ [$json] ],[ 'json' ]));
+    ddump($ppt->{log}, $json, 'json');
     return $json;
 }
 
@@ -204,8 +211,7 @@ method parse(Str $json) {
 
     for my $token (@tokens) {
         if (defined $self->recognizer->read( @$token )) {
-            $self->log->debug(
-                'Reading token: '.Data::Dumper->Dump($token, ['token']));
+            ddump($self->log, $token, 'token');
         }
         else {
             $self->log->log_and_die(
@@ -216,7 +222,7 @@ method parse(Str $json) {
     }
 
     my $output = ${$self->recognizer->value};
-    $self->log->notice(Data::Dumper->Dump([$output], ['final']));
+    ddump($self->log, $output, 'final');
     return $output;
 }
 
